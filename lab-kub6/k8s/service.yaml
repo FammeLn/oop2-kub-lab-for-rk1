@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: akka-sharding-service
+  namespace: akka-sharding
+  labels:
+    app: akka-sharding
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: akka-sharding
+  ports:
+    - name: remoting
+      port: 25520
+      targetPort: 25520
+      protocol: TCP
+    - name: management
+      port: 8558
+      targetPort: 8558
+      protocol: TCP

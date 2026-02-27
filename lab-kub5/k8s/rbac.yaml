@@ -1,0 +1,78 @@
+# =====================================================================
+# RBAC КОНФИГУРАЦИЯ ДЛЯ AKKA CLUSTER BOOTSTRAP
+# =====================================================================
+#
+# Для работы Service Discovery через Kubernetes API необходимо:
+# 1. ServiceAccount - идентификатор для Pod'ов
+# 2. Role - права на чтение информации о Pod'ах
+# 3. RoleBinding - связь ServiceAccount с Role
+#
+# ВАЖНО: Без этих прав bootstrap не сможет найти другие Pod'ы!
+#
+# =====================================================================
+
+---
+# =====================================================================
+# 1. SERVICE ACCOUNT
+# =====================================================================
+#
+# ServiceAccount используется Pod'ами для идентификации при обращении к API.
+# Каждый Pod получает токен этого ServiceAccount.
+#
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: akka-cluster-sa
+  namespace: akka-cluster
+  labels:
+    app: akka-cluster
+
+---
+# =====================================================================
+# 2. ROLE
+# =====================================================================
+#
+# Role определяет, какие операции разрешены в этом namespace.
+# Для Discovery нужны права на чтение Pod'ов.
+#
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: akka-cluster-role
+  namespace: akka-cluster
+  labels:
+    app: akka-cluster
+rules:
+  # Права на чтение Pod'ов
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  
+  # Права на чтение endpoints (для альтернативного discovery)
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+
+---
+# =====================================================================
+# 3. ROLE BINDING
+# =====================================================================
+#
+# RoleBinding связывает ServiceAccount с Role.
+# Pod'ы с этим ServiceAccount получают права из Role.
+#
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: akka-cluster-rolebinding
+  namespace: akka-cluster
+  labels:
+    app: akka-cluster
+subjects:
+  - kind: ServiceAccount
+    name: akka-cluster-sa
+    namespace: akka-cluster
+roleRef:
+  kind: Role
+  name: akka-cluster-role
+  apiGroup: rbac.authorization.k8s.io

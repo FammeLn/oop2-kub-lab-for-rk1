@@ -1,0 +1,171 @@
+# =====================================================================
+# KUBERNETES DEPLOYMENT ДЛЯ AKKA CLUSTER
+# =====================================================================
+#
+# Deployment управляет жизненным циклом Pod'ов:
+# - Создание заданного количества реплик
+# - Автоматический перезапуск при сбоях
+# - Rolling updates при изменении конфигурации
+# - Масштабирование (scale up/down)
+#
+# =====================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: akka-cluster-deployment
+  namespace: akka-cluster
+  labels:
+    app: akka-cluster
+spec:
+  # ======================================================================
+  # КОЛИЧЕСТВО РЕПЛИК
+  # ======================================================================
+  #
+  # Начинаем с 3 реплик для демонстрации кластера
+  # Масштабирование: kubectl scale deployment/akka-cluster-deployment --replicas=5 -n akka-cluster
+  #
+  replicas: 3
+  
+  # ======================================================================
+  # SELECTOR
+  # ======================================================================
+  #
+  # Определяет, какие Pod'ы управляются этим Deployment
+  #
+  selector:
+    matchLabels:
+      app: akka-cluster
+  
+  # ======================================================================
+  # СТРАТЕГИЯ ОБНОВЛЕНИЯ
+  # ======================================================================
+  #
+  # RollingUpdate обновляет Pod'ы постепенно, сохраняя доступность
+  #
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1  # Максимум 1 Pod может быть недоступен
+      maxSurge: 1        # Максимум 1 дополнительный Pod во время обновления
+  
+  # ======================================================================
+  # ШАБЛОН POD'А
+  # ======================================================================
+  template:
+    metadata:
+      labels:
+        app: akka-cluster
+    
+    spec:
+      # ServiceAccount для доступа к Kubernetes API
+      serviceAccountName: akka-cluster-sa
+      
+      # ======================================================================
+      # КОНТЕЙНЕР С ПРИЛОЖЕНИЕМ
+      # ======================================================================
+      containers:
+        - name: akka-cluster
+          
+          # Docker образ приложения
+          # ВАЖНО: измените на ваш registry!
+          image: akka-cluster-bootstrap:latest
+          imagePullPolicy: IfNotPresent
+          
+          # ======================================================================
+          # ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
+          # ======================================================================
+          env:
+            # Hostname Pod'а (используется Akka Management)
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            
+            # Namespace Pod'а
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            
+            # Имя Pod'а (для логирования)
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            
+            # IP Pod'а
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            
+            # Java опции (для настройки JVM)
+            - name: JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          
+          # ======================================================================
+          # ПОРТЫ КОНТЕЙНЕРА
+          # ======================================================================
+          ports:
+            # Akka Remoting (связь между узлами)
+            - name: remoting
+              containerPort: 25520
+              protocol: TCP
+            
+            # Akka Management HTTP endpoint
+            - name: management
+              containerPort: 8558
+              protocol: TCP
+          
+          # ======================================================================
+          # HEALTH CHECKS
+          # ======================================================================
+          
+          # Liveness Probe - проверка жизнеспособности
+          # Если проверка падает, Kubernetes убивает и перезапускает Pod
+          livenessProbe:
+            httpGet:
+              path: /alive
+              port: management
+            initialDelaySeconds: 30  # Ждём 30 секунд после старта
+            periodSeconds: 10        # Проверяем каждые 10 секунд
+            timeoutSeconds: 3
+            failureThreshold: 3      # 3 неудачи подряд = restart
+          
+          # Readiness Probe - проверка готовности
+          # Если проверка падает, Pod исключается из Service
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: management
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          # ======================================================================
+          # РЕСУРСЫ
+          # ======================================================================
+          #
+          # Requests - гарантированные ресурсы
+          # Limits - максимальные ресурсы
+          #
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+      
+      # ======================================================================
+      # НАСТРОЙКИ POD'А
+      # ======================================================================
+      
+      # Graceful shutdown
+      # Даём время для корректного выхода из кластера
+      terminationGracePeriodSeconds: 30
+      
+      # Restart policy
+      restartPolicy: Always

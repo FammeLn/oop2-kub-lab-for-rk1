@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    
+    <!-- Конфигурация логирования для Akka Cluster приложения -->
+    
+    <!-- Appender для консоли -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Appender для файла (опционально, для production) -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/application.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/application.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Логирование Akka -->
+    <logger name="akka" level="INFO" />
+    <logger name="akka.actor" level="INFO" />
+    <logger name="akka.cluster" level="INFO" />
+    
+    <!-- Логирование Akka Management -->
+    <logger name="akka.management" level="INFO" />
+    <logger name="akka.management.cluster.bootstrap" level="INFO" />
+    
+    <!-- Логирование Discovery -->
+    <logger name="akka.discovery" level="INFO" />
+    
+    <!-- Логирование HTTP (для Management endpoint) -->
+    <logger name="akka.http" level="WARN" />
+    
+    <!-- Логирование нашего приложения -->
+    <logger name="com.akka.kublab5" level="INFO" />
+    
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+        <!-- Раскомментируйте для записи в файл -->
+        <!-- <appender-ref ref="FILE" /> -->
+    </root>
+    
+</configuration>

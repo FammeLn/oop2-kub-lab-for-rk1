@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: akka-persistence-deployment
+  namespace: akka-persistence
+  labels:
+    app: akka-persistence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: akka-persistence
+  template:
+    metadata:
+      labels:
+        app: akka-persistence
+    spec:
+      serviceAccountName: akka-persistence-sa
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: akka-persistence
+          image: akka-persistence-sharding:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AKKA_MANAGEMENT_HTTP_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AKKA_REMOTE_ARTERY_CANONICAL_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: JAVA_OPTS
+              value: "-Xms384m -Xmx768m"
+          ports:
+            - name: remoting
+              containerPort: 25520
+            - name: management
+              containerPort: 8558
+          volumeMounts:
+            - name: akka-data
+              mountPath: /var/lib/akka
+          livenessProbe:
+            httpGet:
+              path: /alive
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: management
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "384Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+      volumes:
+        - name: akka-data
+          persistentVolumeClaim:
+            claimName: akka-persistence-data

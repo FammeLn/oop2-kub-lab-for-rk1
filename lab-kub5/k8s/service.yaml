@@ -1,0 +1,55 @@
+# =====================================================================
+# KUBERNETES SERVICE ДЛЯ AKKA CLUSTER
+# =====================================================================
+#
+# Service предоставляет:
+# 1. Стабильное DNS имя для Pod'ов
+# 2. Service Discovery - список Pod'ов через Kubernetes API
+# 3. (Опционально) Load balancing для внешнего трафика
+#
+# ВАЖНО ДЛЯ AKKA CLUSTER:
+# - Service НЕ используется для балансировки трафика между узлами
+# - Service используется ТОЛЬКО для discovery Pod'ов
+# - Узлы кластера общаются напрямую (peer-to-peer)
+#
+# =====================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: akka-cluster-service
+  namespace: akka-cluster
+  labels:
+    app: akka-cluster
+spec:
+  # Тип сервиса
+  # ClusterIP - внутренний сервис, доступен только внутри кластера
+  # Для внешнего доступа можно использовать LoadBalancer или NodePort
+  type: ClusterIP
+  
+  # Cluster IP: None создаёт "headless" service
+  # Headless service возвращает IP всех Pod'ов вместо одного VIP
+  # Это полезно для Service Discovery
+  clusterIP: None
+  
+  # Selector определяет, какие Pod'ы входят в этот Service
+  selector:
+    app: akka-cluster
+  
+  # Порты, которые открывает Service
+  ports:
+    # Порт для Akka Remoting (связь между узлами кластера)
+    - name: remoting
+      port: 25520
+      targetPort: 25520
+      protocol: TCP
+    
+    # Порт для Akka Management (HTTP endpoint)
+    - name: management
+      port: 8558
+      targetPort: 8558
+      protocol: TCP
+  
+  # Publish not ready addresses
+  # ВАЖНО: даже не готовые Pod'ы должны быть видны для bootstrap
+  publishNotReadyAddresses: true
